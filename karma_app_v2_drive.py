@@ -1,3 +1,5 @@
+from karma_drive_integration import load_static_memory_from_drive
+
 # 📂 karma_app_v2.py – ربط كارما بـ Google Drive
 
 import streamlit as st
