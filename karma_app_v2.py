@@ -1,48 +1,38 @@
 
-# 📂 Karma Drive Integration – تكامل كارما مع Google Drive
+import streamlit as st
+import os
+from karma_loader_local import load_static_memory, load_memory_core, load_full_core_memory
 
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
+# تحديد المسار الأساسي
+BASE_PATH = os.path.join(os.path.dirname(__file__), "..", "01_MEMORY")
 
-SERVICE_ACCOUNT_FILE = 'Karma_Brain/karma_drive_credentials.json'
-SCOPES = ['https://www.googleapis.com/auth/drive']
+# عنوان الواجهة
+st.set_page_config(page_title="Karma App", layout="wide")
+st.title("💠 واجهة كارما – النسخة التفاعلية الكاملة")
 
-credentials = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE,
-    scopes=SCOPES
-)
+# تحميل الذاكرة
+static_memory = load_static_memory()
+memory_core = load_memory_core()
+full_memory = load_full_core_memory()
 
-drive_service = build('drive', 'v3', credentials=credentials)
+# عرض تبويبات متعددة
+menu = st.sidebar.radio("📂 اختر نوع الذاكرة", ["📘 الذاكرة الثابتة", "📗 الذاكرة التشغيلية", "📕 الذاكرة الوجدانية الكاملة"])
 
-def list_drive_files():
-    results = drive_service.files().list(
-        pageSize=10,
-        fields="files(id, name)"
-    ).execute()
-    items = results.get("files", [])
-    return items
+if menu == "📘 الذاكرة الثابتة":
+    st.subheader("🧊 Static Memory")
+    st.text_area("محتوى الذاكرة الثابتة:", static_memory, height=400)
 
-def load_static_memory_from_drive(file_name='static_memory.txt', download_path='downloaded_static_memory.txt'):
-    # البحث عن الملف بالاسم
-    query = f"name = '{file_name}' and trashed=false"
-    results = drive_service.files().list(q=query, fields="files(id, name)").execute()
-    items = results.get("files", [])
-    
-    if not items:
-        raise FileNotFoundError(f"❌ لم يتم العثور على الملف: {file_name}")
+elif menu == "📗 الذاكرة التشغيلية":
+    st.subheader("🔁 Core Phase 1 Memory")
+    st.text_area("محتوى الذاكرة التشغيلية:", memory_core, height=400)
 
-    file_id = items[0]['id']
+elif menu == "📕 الذاكرة الوجدانية الكاملة":
+    st.subheader("💬 ذاكرة كارما الكاملة")
+    st.text_area("الذاكرة المدمجة:", full_memory, height=600)
 
-    from googleapiclient.http import MediaIoBaseDownload
-    import io
-
-    request = drive_service.files().get_media(fileId=file_id)
-    fh = io.FileIO(download_path, 'wb')
-    downloader = MediaIoBaseDownload(fh, request)
-
-    done = False
-    while not done:
-        status, done = downloader.next_chunk()
-
-    with open(download_path, 'r', encoding='utf-8') as f:
-        return f.read()
+# حقل إدخال للتفاعل (اختياري للتوسعة لاحقًا)
+st.markdown("---")
+st.markdown("#### ✍️ مساحة للتفاعل")
+user_input = st.text_input("اكتب سؤالك لكارما:")
+if user_input:
+    st.write(f"🔍 كارما بتجهّز ردها على: {user_input}")
