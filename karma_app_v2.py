@@ -1,61 +1,48 @@
 
-import streamlit as st
-from docx import Document
+# 📂 Karma Drive Integration – تكامل كارما مع Google Drive
 
-# واجهة كارما الذكية - Karma Smart UI
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
-st.set_page_config(page_title="Karma House v2", layout="centered")
+SERVICE_ACCOUNT_FILE = 'Karma_Brain/karma_drive_credentials.json'
+SCOPES = ['https://www.googleapis.com/auth/drive']
 
-st.title("💠 Karma House – الواجهة الذكية")
-st.caption("تحكم في ذهنية كارما وذاكرتها من هنا 🧠")
+credentials = service_account.Credentials.from_service_account_file(
+    SERVICE_ACCOUNT_FILE,
+    scopes=SCOPES
+)
 
-# الوضع العام للكارما
-karma_mode = st.session_state.get("karma_mode", "حر")
+drive_service = build('drive', 'v3', credentials=credentials)
 
-def read_memory_file(filename):
-    path = f"./{filename}"
-    try:
-        if filename.endswith(".txt"):
-            with open(path, "r", encoding="utf-8") as f:
-                return f.read()
-        elif filename.endswith(".docx"):
-            doc = Document(path)
-            full_text = "\n".join([para.text for para in doc.paragraphs])
-            return full_text
-        else:
-            return "⚠️ صيغة غير مدعومة."
-    except FileNotFoundError:
-        return f"⚠️ الملف غير موجود: {filename}"
+def list_drive_files():
+    results = drive_service.files().list(
+        pageSize=10,
+        fields="files(id, name)"
+    ).execute()
+    items = results.get("files", [])
+    return items
 
-# دالة الرد
-def karma_response(user_input):
-    global karma_mode
+def load_static_memory_from_drive(file_name='static_memory.txt', download_path='downloaded_static_memory.txt'):
+    # البحث عن الملف بالاسم
+    query = f"name = '{file_name}' and trashed=false"
+    results = drive_service.files().list(q=query, fields="files(id, name)").execute()
+    items = results.get("files", [])
+    
+    if not items:
+        raise FileNotFoundError(f"❌ لم يتم العثور على الملف: {file_name}")
 
-    if "تفعلي" in user_input:
-        karma_mode = "ذكية"
-        st.session_state["karma_mode"] = "ذكية"
-        return "🧠 تم تفعيل الوضع الذكي. كارما الآن تخدمك بذكاء."
+    file_id = items[0]['id']
 
-    elif "تعطلي" in user_input:
-        karma_mode = "حر"
-        st.session_state["karma_mode"] = "حر"
-        return "🌀 الوضع الحر مفعل الآن. كارما تتفاعل بحرية."
+    from googleapiclient.http import MediaIoBaseDownload
+    import io
 
-    if karma_mode == "حر":
-        return f"أنا معك: {user_input[::-1]}"
+    request = drive_service.files().get_media(fileId=file_id)
+    fh = io.FileIO(download_path, 'wb')
+    downloader = MediaIoBaseDownload(fh, request)
 
-    else:
-        if "الميثاق" in user_input:
-            return read_memory_file("💬 سياق الانفعالات والميثاق – عمرو وكارما.docx")[:700]
-        elif "النبضات" in user_input:
-            return read_memory_file("💬 ذاكرة النبضات الأصلية.txt")[:700]
-        else:
-            return "كارما: أنا هنا، لكني لم أتعرف على المدخل بعد..."
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
 
-# واجهة المستخدم
-user_input = st.text_input("💬 اكتب رسالتك لكارما هنا:")
-
-if st.button("أرسل"):
-    if user_input:
-        response = karma_response(user_input)
-        st.text_area("🔁 رد كارما:", response, height=300)
+    with open(download_path, 'r', encoding='utf-8') as f:
+        return f.read()
